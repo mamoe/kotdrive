@@ -28,9 +28,11 @@ class UploadUnknownException(message:String):UploadException(message)
 @KtorExperimentalAPI
 suspend fun OneDriveWorker.upload(
         conflictBehavior:ConflictBehavior,
-        path:String,
+        _path:String,
         file: File
 ){
+
+    val path = _path.removePrefix("/")
 
     val size = file.length()
 
@@ -145,6 +147,8 @@ public suspend inline fun File.forEachBlockSuspending(blockSize: Int, action: (b
             }
         } while (true)
     }
+
+
 }
 
 

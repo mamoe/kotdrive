@@ -44,7 +44,7 @@ open class Worker(
 }
 
 @ExperimentalContracts
-inline fun Worker.tryNTimes(n:Int = 2, builder: Worker.() -> Unit):Exception? {
+inline fun <T:Worker> T.tryNTimes(n:Int = 2, builder: T.() -> Unit):Exception? {
     contract {
         callsInPlace(builder, InvocationKind.AT_LEAST_ONCE)
     }
