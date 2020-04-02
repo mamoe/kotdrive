@@ -1,6 +1,9 @@
 package net.mamoe
 
+import com.google.gson.Gson
 import com.google.gson.JsonObject
+import com.google.gson.JsonParser
+import com.google.gson.reflect.TypeToken
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.cio.CIO
 import io.ktor.client.request.*
@@ -8,13 +11,20 @@ import io.ktor.client.request.forms.MultiPartFormDataContent
 import io.ktor.client.request.forms.formData
 import io.ktor.http.ContentType
 import io.ktor.http.HttpMethod
+import io.ktor.http.contentType
 import io.ktor.http.takeFrom
+import io.ktor.util.AttributeKey
 import io.ktor.util.InternalAPI
 import io.ktor.util.KtorExperimentalAPI
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
+import net.mamoe.protocol.upload
+import org.jsoup.Jsoup
 import java.text.SimpleDateFormat
 import java.util.*
+import kotlin.contracts.ExperimentalContracts
+import kotlin.contracts.InvocationKind
+import kotlin.contracts.contract
 import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.EmptyCoroutineContext
 
@@ -33,6 +43,24 @@ open class Worker(
     }
 }
 
+@ExperimentalContracts
+inline fun Worker.tryNTimes(n:Int = 2, builder: Worker.() -> Unit):Exception? {
+    contract {
+        callsInPlace(builder, InvocationKind.AT_LEAST_ONCE)
+    }
+    var lastException: Exception? = null
+    repeat(n) {
+        try {
+            builder.invoke(this)
+            return null
+        } catch (e: Exception) {
+            lastException = e
+        }
+    }
+    return lastException
+}
+
+
 open class HttpWorker @KtorExperimentalAPI constructor(
         logPrefix:String = "Http",
         enableLog: Boolean = true,
@@ -46,8 +74,10 @@ class OneDriveWorker @KtorExperimentalAPI constructor(
         logPrefix:String = "OneDrive",
         enableLog: Boolean = true,
         _coroutineContext:CoroutineContext = EmptyCoroutineContext,
-        client:HttpClient = HttpClient(CIO),
-        private val authProvider: AuthProvider
+        client:HttpClient = HttpClient(CIO){
+            expectSuccess = false
+        },
+        internal val authProvider: AuthProvider
 ):HttpWorker(logPrefix,enableLog,_coroutineContext,client){
 
     class DataDSLBuilder{
@@ -65,21 +95,24 @@ class OneDriveWorker @KtorExperimentalAPI constructor(
     ):JsonObject{
         val accessToken = authProvider.getAccessToken()
 
-        client.request<String> {
-            url.takeFrom(authProvider.getBaseUrl() + path)
-            method = _method
-            body = MultiPartFormDataContent(formData {
-                data.forEach {
-                    this.append(it.key,it.value.toString())
-                }
+        val result = client.request<String> {
+            url.takeFrom((authProvider.getBaseUrl() + path.removePrefix("/")).also {
+                log("Sending a " + _method.value + " to " + it )
             })
+            method = _method
+            if(data.isNotEmpty()) {
+                body = data.toJson().also {
+                    log("With body of $it")
+                }
+                contentType(ContentType.Application.Json)
+            }
             headers {
                 accept(ContentType.Application.Json)
                 header("Authorization","${accessToken.type} ${accessToken.token}")
             }
         }
 
-        return JsonObject()
+        return result.decodeJson()
     }
 
     suspend inline fun connect(
@@ -97,6 +130,8 @@ class OneDriveWorker @KtorExperimentalAPI constructor(
     suspend fun get(path:String, data: Map<String,Any>):JsonObject = connect(HttpMethod.Get,path, data)
 
     suspend inline fun get(path:String, dataBuilder:DataDSLBuilder.() -> Unit):JsonObject = connect(HttpMethod.Get,path, dataBuilder)
+
+    suspend fun get(path:String):JsonObject = get(path, mapOf())
 
     suspend fun put(path:String, data: Map<String,Any>):JsonObject = connect(HttpMethod.Put,path, data)
 
@@ -117,8 +152,52 @@ class OneDriveWorker @KtorExperimentalAPI constructor(
 
 
 @KtorExperimentalAPI
-fun oneDriveWorker(logPrefix:String = "Http", enableLog: Boolean = true, _coroutineContext:CoroutineContext = EmptyCoroutineContext, client:HttpClient = HttpClient(CIO), block:() -> AuthProvider):OneDriveWorker{
+fun oneDriveWorker(logPrefix:String = "Http", enableLog: Boolean = true, _coroutineContext:CoroutineContext = EmptyCoroutineContext, client:HttpClient = HttpClient(CIO){
+    expectSuccess = false
+}, block:() -> AuthProvider):OneDriveWorker{
     return OneDriveWorker(
             logPrefix,enableLog,_coroutineContext,client,block.invoke()
-    )
+    ).also {
+
+    }
+}
+
+
+fun Collection<*>.toJson():String = Gson().toJson(this)
+fun Map<String,Any>.toJson():String{
+    return Gson().toJson(this)
+}
+
+fun String.decodeJsonList():List<String> {
+    if(this.isBlank() || this == "{}"){
+        return listOf()
+    }
+    return Gson().fromJson(this,object : TypeToken<List<String>>(){}.type)
+}
+fun String.decodeJson(): JsonObject {
+    return  JsonParser.parseString(this).asJsonObject
+}
+
+fun json(
+        vararg pair: Pair<String,Any>
+):String{
+    return pair.toMap().toJson()
+}
+
+fun buildJson(
+        block: MutableMap<String,Any>.() -> Unit
+):String{
+    return with(mutableMapOf<String,Any>()){
+        block.invoke(this)
+        this.toJson()
+    }
+}
+
+fun buildMap(
+        block: MutableMap<String,Any>.() -> Unit
+):Map<String,Any>{
+    return with(mutableMapOf<String,Any>()){
+        block.invoke(this)
+        this
+    }
 }

@@ -16,7 +16,6 @@ interface AuthProvider{
      */
     suspend fun getAccessToken():AccessToken
 
-
     /**
      * Api Base Url
      *
@@ -24,6 +23,6 @@ interface AuthProvider{
      * commonly it should be the default value
      * but certain business account may have different index
      */
-    fun getBaseUrl():String = "https://graph.microsoft.com/v1.0"
+    suspend fun getBaseUrl():String = "https://graph.microsoft.com/v1.0"
 }
 

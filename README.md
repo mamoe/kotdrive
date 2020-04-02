@@ -1,2 +1,8 @@
 # kotdrive
-Upload Big File to OneDrive via OneDrive API in incredible speed
+
+OneDrive API in Kotlin
+
+now supported: 
+<li>
+Upload File to OneDrive
+</li>
