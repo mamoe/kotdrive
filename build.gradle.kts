@@ -10,7 +10,7 @@ version = "1.0.0"
 
 apply(plugin = "com.github.johnrengelman.shadow")
 
-fun ktor(id: String, version: String = "1.3.2") = "io.ktor:ktor-$id:$version"
+fun ktor(id: String, version: String = "1.3.1") = "io.ktor:ktor-$id:$version"
 
 fun DependencyHandlerScope.kotlinx(id: String, version: String) = "org.jetbrains.kotlinx:kotlinx-$id:$version"
 
@@ -26,7 +26,9 @@ dependencies {
     implementation("org.jsoup:jsoup:1.12.1")
     implementation(ktor("server-cio"))
     implementation(ktor("client-cio"))
+    implementation(ktor("client-core"))
     implementation(ktor("http-jvm"))
+    compile(ktor("client-auth"))
     implementation("com.google.code.gson:gson:2.8.6")
 
     implementation(kotlinx("coroutines-core", "1.3.5"))
