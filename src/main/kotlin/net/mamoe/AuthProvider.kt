@@ -1,6 +1,11 @@
 package net.mamoe
 
 
+data class AccessToken(
+        val type:String = "bearer",
+        val token:String
+)
+
 interface AuthProvider{
     /**
      * you should include cache in your build
@@ -9,7 +14,8 @@ interface AuthProvider{
      *
      * Refer to OneDrive API on how to get a access token
      */
-    suspend fun getAccessToken():String
+    suspend fun getAccessToken():AccessToken
+
 
     /**
      * Api Base Url
