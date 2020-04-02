@@ -37,9 +37,6 @@ suspend fun OneDriveWorker.upload(
     val size = file.length()
 
     suspend fun uploadBig() {
-        val map = mapOf(
-                "@microsoft.graph.conflictBehavior" to conflictBehavior.id
-        )
         val resp = post("/me/drive/root:/${path}:/createUploadSession") {
             "item" to buildMap {
                 this["@microsoft.graph.conflictBehavior"] = conflictBehavior.id
