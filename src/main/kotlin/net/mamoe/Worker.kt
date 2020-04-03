@@ -6,6 +6,7 @@ import com.google.gson.JsonParser
 import com.google.gson.reflect.TypeToken
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.cio.CIO
+import io.ktor.client.features.HttpTimeout
 import io.ktor.client.request.*
 import io.ktor.client.request.forms.MultiPartFormDataContent
 import io.ktor.client.request.forms.formData
@@ -60,12 +61,25 @@ inline fun <T:Worker> T.tryNTimes(n:Int = 2, builder: T.() -> Unit):Exception? {
     return lastException
 }
 
+fun buildDefaultHttpClient():HttpClient{
+    return HttpClient(CIO){
+        expectSuccess = false
+        engine {
+            requestTimeout = 600_000
+        }
+        install(HttpTimeout) {
+            socketTimeoutMillis = 600_000
+            requestTimeoutMillis = 600_000
+            connectTimeoutMillis = 600_000
+        }
+    }
+}
 
 open class HttpWorker @KtorExperimentalAPI constructor(
         logPrefix:String = "Http",
         enableLog: Boolean = true,
         _coroutineContext:CoroutineContext = EmptyCoroutineContext,
-        val client:HttpClient = HttpClient(CIO)
+        val client:HttpClient = buildDefaultHttpClient()
         ):Worker(logPrefix,enableLog,_coroutineContext)
 
 
@@ -74,9 +88,7 @@ class OneDriveWorker @KtorExperimentalAPI constructor(
         logPrefix:String = "OneDrive",
         enableLog: Boolean = true,
         _coroutineContext:CoroutineContext = EmptyCoroutineContext,
-        client:HttpClient = HttpClient(CIO){
-            expectSuccess = false
-        },
+        client:HttpClient = buildDefaultHttpClient(),
         internal val authProvider: AuthProvider
 ):HttpWorker(logPrefix,enableLog,_coroutineContext,client){
 
@@ -152,14 +164,8 @@ class OneDriveWorker @KtorExperimentalAPI constructor(
 
 
 @KtorExperimentalAPI
-fun oneDriveWorker(logPrefix:String = "Http", enableLog: Boolean = true, _coroutineContext:CoroutineContext = EmptyCoroutineContext, client:HttpClient = HttpClient(CIO){
-    expectSuccess = false
-}, block:() -> AuthProvider):OneDriveWorker{
-    return OneDriveWorker(
-            logPrefix,enableLog,_coroutineContext,client,block.invoke()
-    ).also {
-
-    }
+fun oneDriveWorker(logPrefix:String = "Http", enableLog: Boolean = true, _coroutineContext:CoroutineContext = EmptyCoroutineContext, client:HttpClient = buildDefaultHttpClient(), block:() -> AuthProvider):OneDriveWorker{
+    return OneDriveWorker(logPrefix,enableLog,_coroutineContext,client,block.invoke())
 }
 
 
